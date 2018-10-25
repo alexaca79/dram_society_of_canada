@@ -1,0 +1,120 @@
+---
+title: "Whisky Analysis "
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#Dram Society of Canada Data Cleaning 
+library(tidyverse)
+library(summarytools)
+library(caret)
+library(rattle)
+##Data Load 
+
+whiskyinfo <- read.csv("D:/projects/Dram Society of Canada/Dram Society of Canada - Master List.csv") 
+
+whiskyinfo$Alex.W <- NULL
+
+whiskyinfo$ABV[whiskyinfo$ABV == 26 ]  <- 46
+whiskyinfo$PRICE <- as.numeric(whiskyinfo$PRICE)
+
+whiskyinfoL <- gather(whiskyinfo, key = "Individual" , value = "value", c(12:43), na.rm = FALSE,
+       convert = FALSE, factor_key = FALSE)
+
+
+whiskyinfoL.naremove <- whiskyinfoL[complete.cases(whiskyinfoL[ , 13]),]
+
+whiskyinfoL.naremove$Individual <- as.factor(whiskyinfoL.naremove$Individual)
+whiskyinfoL.naremove$WHISKYNAME <- paste(whiskyinfoL.naremove$WHISKY,whiskyinfoL.naremove$AGE)
+whiskyinfoL.naremove$ABV <- as.integer(whiskyinfoL.naremove$ABV)
+```
+
+## ORIGIN
+
+
+```{r }
+
+plot(whiskyinfoL.naremove$ORIGIN,whiskyinfoL.naremove$value)
+
+ORIGIN <- with(whiskyinfoL.naremove, 
+                   by(value, ORIGIN, descr, 
+                      stats = c("mean", "sd", "min", "med", "max")))
+view(ORIGIN, "pander", style = "rmarkdown")
+```
+
+## ABV
+
+```{r ,echo=FALSE}
+plot(whiskyinfoL.naremove$ABV,whiskyinfoL.naremove$value)
+
+ABV <- with(whiskyinfoL.naremove, 
+                   by(value, ABV, descr, 
+                      stats = c("mean", "sd", "min", "med", "max")))
+view(ABV, "pander", style = "rmarkdown")
+```
+
+## PRICE
+
+
+```{r ,echo=FALSE}
+plot(whiskyinfoL.naremove$PRICE,whiskyinfoL.naremove$value)
+
+PRICE <- with(whiskyinfoL.naremove, 
+                   by(value, PRICE, descr, 
+                      stats = c("mean", "sd", "min", "med", "max")))
+view(PRICE, "pander", style = "rmarkdown")
+```
+
+## AGE
+
+```{r ,echo=FALSE}
+plot(whiskyinfoL.naremove$AGE,whiskyinfoL.naremove$value)
+
+AGE <- with(whiskyinfoL.naremove, 
+                   by(value, AGE, descr, 
+                      stats = c("mean", "sd", "min", "med", "max")))
+view(AGE, "pander", style = "rmarkdown")
+```
+
+## Decision Tree 
+
+
+```{r }
+
+fitControl <- trainControl(method="repeatedcv",number=10,repeats=10)
+
+train.rpart <- train(value ~ PRICE + ABV + ORIGIN + AGE, 
+                     data=whiskyinfoL.naremove,
+                     method="rpart",
+                     tuneLength=10,
+                     na.action = na.pass,
+                     trControl=fitControl)
+
+train.rpart2 <- train(value ~ PRICE + ABV + ORIGIN + AGE, 
+                     data=whiskyinfoL.naremove,
+                     method="rpart2",
+                     tuneLength=10,
+                     na.action = na.pass,
+                     trControl=fitControl)
+
+train.glmnet <- train(value ~ PRICE + ABV + ORIGIN + AGE, 
+                     data=whiskyinfoL.naremove,
+                     method="glm",
+                     tuneLength=10,
+                     na.action = na.pass,
+                     trControl=fitControl)
+
+
+
+resamps <- resamples(list(rfst = train.rpart,
+                          rfst2 = train.rpart2,
+                          glm = train.glmnet
+                          ))
+
+summary(resamps)
+
+fancyRpartPlot(train.rpart$finalModel)
+
+
+
+```
